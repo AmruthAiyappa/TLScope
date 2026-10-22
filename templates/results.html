@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+
+{% block title %}TLScope Audit — {{ scan.hostname }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Top Navigation Actions -->
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> New Inspection
+        </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="small text-muted mono bg-navy-darker px-2 py-1 rounded border border-secondary-subtle">
+                ID: {{ scan.scan_id[:8] }}...
+            </span>
+            <a href="{{ url_for('download_pdf', scan_id=scan.scan_id) }}" class="btn btn-cyan btn-sm">
+                <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Executive Summary Banner Card with Radar Chart -->
+    <div class="audit-card cyber-corner p-4 mb-4">
+        <div class="row align-items-center gy-4">
+            <div class="col-lg-7">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary mono">
+                        <i class="bi bi-ethernet me-1"></i>Port {{ scan.port }}
+                    </span>
+                    <span class="badge bg-secondary-subtle text-cyan border border-secondary mono">
+                        <i class="bi bi-pin-map me-1"></i>Pinned IP: {{ scan.ip_address }}
+                    </span>
+                    <span class="badge bg-secondary-subtle text-muted mono small">
+                        <i class="bi bi-clock me-1"></i>{{ scan.scan_timestamp }}
+                    </span>
+                </div>
+                <h2 class="fw-bold text-light mb-2 mono">
+                    <i class="bi bi-globe me-2 text-cyan-bright"></i>{{ scan.hostname }}
+                </h2>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-3">
+                    {% if scan.overall_outcome == 'SECURE' %}
+                    <span class="status-badge status-pass fs-6">
+                        <span class="pulse-beacon pulse-beacon-green"></span>SECURE POSTURE
+                    </span>
+                    {% elif scan.overall_outcome == 'WARNINGS' %}
+                    <span class="status-badge status-warning fs-6">
+                        <i class="bi bi-exclamation-triangle me-1"></i>WARNINGS DETECTED
+                    </span>
+                    {% elif scan.overall_outcome == 'INSECURE' %}
+                    <span class="status-badge status-fail fs-6">
+                        <span class="pulse-beacon pulse-beacon-red"></span>SECURITY DEFICIENCIES
+                    </span>
+                    {% else %}
+                    <span class="status-badge status-fail fs-6">
+                        <i class="bi bi-x-circle me-1"></i>SCAN FAILED
+                    </span>
+                    {% endif %}
+
+                    {% if scan.verification_passed %}
+                    <span class="badge bg-success-subtle text-success border border-success">
+                        <i class="bi bi-check-circle me-1"></i>CA Trust Verified
+                    </span>
+                    {% else %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger">
+                        <i class="bi bi-x-circle me-1"></i>Certificate Verification Failed
+                    </span>
+                    {% endif %}
+
+                    {% if scan.is_diagnostic_leaf %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning" title="Parsed from unverified connection for post-failure diagnostic analysis only">
+                        <i class="bi bi-eye me-1"></i>Diagnostic Leaf Mode
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Score Circle & Posture Radar -->
+            <div class="col-lg-5">
+                <div class="d-flex align-items-center justify-content-lg-end justify-content-center gap-4">
+                    <div class="text-center text-lg-end">
+                        <div class="small text-muted text-uppercase fw-bold mono">Educational Score</div>
+                        <div class="small text-secondary mono">{{ scan.score_label }}</div>
+                    </div>
+                    <div class="score-badge-circle {% if scan.overall_outcome == 'SECURE' %}score-secure{% elif scan.overall_outcome == 'WARNINGS' %}score-warning{% else %}score-insecure{% endif %}">
+                        {% if scan.educational_score is not none %}
+                        <span class="fs-4 mono fw-bold">{{ scan.educational_score }}</span>
+                        <span class="small mono" style="font-size: 0.65rem;">/ 100</span>
+                        {% else %}
+                        <span class="fs-5 mono">N/A</span>
+                        {% endif %}
+                    </div>
+                    <!-- Mini Radar Canvas Container -->
+                    <div style="width: 130px; height: 130px;" class="d-none d-sm-block">
+                        <canvas id="postureRadarCanvas" width="130" height="130"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if scan.error_message %}
+        <div class="alert alert-danger mt-3 mb-0 d-flex align-items-start gap-2 border-danger" role="alert">
+            <i class="bi bi-exclamation-octagon-fill fs-5 mt-1 text-danger"></i>
+            <div>
+                <div class="fw-bold mono">Connection or Handshake Notice:</div>
+                <div class="small">{{ scan.error_message }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Connection Pipeline HUD -->
+    {% if scan.pipeline_stages %}
+    <div class="audit-card cyber-corner p-3 mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="small text-muted mono fw-bold text-uppercase">
+                <i class="bi bi-bezier2 me-1 text-cyan-bright"></i> End-to-End Handshake Pipeline
+            </span>
+            <span class="badge bg-secondary-subtle text-light mono small">{{ scan.pipeline_stages|length }} Stages Audited</span>
+        </div>
+        <div class="row g-2">
+            {% for st in scan.pipeline_stages %}
+            <div class="col-md-4 col-sm-6">
+                <div class="p-2 rounded bg-navy-darker border border-secondary-subtle h-100">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="small fw-bold text-light mono" style="font-size: 0.78rem;">{{ st.name }}</span>
+                        {% if st.status == 'PASS' %}
+                        <span class="badge bg-success-subtle text-success border border-success" style="font-size: 0.65rem;">PASS</span>
+                        {% elif st.status == 'WARN' %}
+                        <span class="badge bg-warning-subtle text-warning border border-warning" style="font-size: 0.65rem;">WARN</span>
+                        {% elif st.status == 'FAIL' %}
+                        <span class="badge bg-danger-subtle text-danger border border-danger" style="font-size: 0.65rem;">FAIL</span>
+                        {% else %}
+                        <span class="badge bg-secondary-subtle text-muted border border-secondary" style="font-size: 0.65rem;">N/A</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-secondary" style="font-size: 0.72rem; line-height: 1.25;">
+                        {{ st.details }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 6 Key Telemetry Tiles -->
+    <div class="row g-3 mb-4">
+        <!-- 1. Protocol -->
+        <div class="col-md-4 col-lg-2">
+            <div class="telemetry-tile">
+                <div class="telemetry-label">TLS Protocol</div>
+                <div class="telemetry-value text-cyan-bright mono">{{ scan.tls_version or 'N/A' }}</div>
+                <div class="small text-muted mt-1 mono">
+                    ALPN: <span class="text-light">{{ scan.alpn_negotiated or 'None' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Cipher -->
+        <div class="col-md-8 col-lg-3">
+            <div class="telemetry-tile">
+                <div class="telemetry-label">Negotiated Cipher</div>
+                <div class="telemetry-value mono text-truncate text-light" style="font-size: 0.92rem;" title="{{ scan.cipher_suite }}">
+                    {{ scan.cipher_suite or 'N/A' }}
+                </div>
+                <div class="small text-muted mt-1 mono">
+                    Bits: <span class="text-light">{{ scan.cipher_bits or '—' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Forward Secrecy -->
+        <div class="col-md-4 col-lg-2">
+            <div class="telemetry-tile">
+                <div class="telemetry-label">Forward Secrecy</div>
+                <div class="telemetry-value">
+                    {% if scan.cipher_suite and ('ECDHE' in scan.cipher_suite or 'DHE' in scan.cipher_suite or 'TLS_AES' in scan.cipher_suite) %}
+                    <span class="text-success fs-6"><i class="bi bi-shield-check me-1"></i>PFS Active</span>
+                    {% else %}
+                    <span class="text-warning fs-6"><i class="bi bi-shield-slash me-1"></i>No PFS</span>
+                    {% endif %}
+                </div>
+                <div class="small text-muted mt-1 mono">Ephemeral DH</div>
+            </div>
+        </div>
+
+        <!-- 4. Trust Chain -->
+        <div class="col-md-4 col-lg-2">
+            <div class="telemetry-tile">
+                <div class="telemetry-label">Trust Chain</div>
+                <div class="telemetry-value">
+                    {% if scan.chain_verified_by_ca %}
+                    <span class="text-success fs-6"><i class="bi bi-check-circle-fill me-1"></i>Valid Root</span>
+                    {% else %}
+                    <span class="text-danger fs-6"><i class="bi bi-x-circle-fill me-1"></i>Untrusted</span>
+                    {% endif %}
+                </div>
+                <div class="small text-muted mt-1 mono">System Store</div>
+            </div>
+        </div>
+
+        <!-- 5. Hostname Match -->
+        <div class="col-md-4 col-lg-1">
+            <div class="telemetry-tile">
+                <div class="telemetry-label">SAN</div>
+                <div class="telemetry-value">
+                    {% if scan.certificate_details and scan.certificate_details.hostname_matched %}
+                    <span class="text-success fs-6"><i class="bi bi-patch-check-fill"></i> OK</span>
+                    {% else %}
+                    <span class="text-danger fs-6"><i class="bi bi-patch-exclamation-fill"></i> Bad</span>
+                    {% endif %}
+                </div>
+                <div class="small text-muted mt-1 mono">RFC 6125</div>
+            </div>
+        </div>
+
+        <!-- 6. Validity & HSTS -->
+        <div class="col-md-4 col-lg-2">
+            <div class="telemetry-tile">
+                <div class="telemetry-label">Validity / HSTS</div>
+                <div class="telemetry-value mono">
+                    {% if scan.certificate_details and scan.certificate_details.is_valid_now %}
+                    <span class="text-success fs-6">{{ scan.certificate_details.days_remaining }}d left</span>
+                    {% elif scan.certificate_details and scan.certificate_details.is_expired %}
+                    <span class="text-danger fs-6">Expired</span>
+                    {% else %}
+                    <span class="text-muted fs-6">N/A</span>
+                    {% endif %}
+                </div>
+                <div class="small text-muted mt-1 mono">
+                    HSTS: <span class="{% if scan.hsts_present %}text-success{% else %}text-warning{% endif %}">
+                        {{ 'Active' if scan.hsts_present else 'None' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs custom-tabs mb-4" id="auditTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="findings-tab" data-bs-toggle="tab" data-bs-target="#findings" type="button" role="tab">
+                <i class="bi bi-list-check me-1"></i> Security Findings
+                <span class="badge bg-secondary-subtle text-cyan ms-1 border border-secondary">{{ scan.findings|length }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="cert-tab" data-bs-toggle="tab" data-bs-target="#cert" type="button" role="tab">
+                <i class="bi bi-file-earmark-lock2 me-1"></i> Certificate & Trust Chain
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="crypto-tab" data-bs-toggle="tab" data-bs-target="#crypto" type="button" role="tab">
+                <i class="bi bi-cpu me-1"></i> Cryptographic Primitives
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="raw-tab" data-bs-toggle="tab" data-bs-target="#raw" type="button" role="tab">
+                <i class="bi bi-code-slash me-1"></i> Diagnostics & Raw Telemetry
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Contents -->
+    <div class="tab-content" id="auditTabsContent">
+
+        <!-- TAB 1: SECURITY FINDINGS -->
+        <div class="tab-pane fade show active" id="findings" role="tabpanel">
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <!-- Interactive Filter Buttons -->
+                <div class="btn-group btn-group-sm" role="group" aria-label="Finding filters">
+                    <button type="button" class="btn btn-outline-cyan active filter-btn" data-filter="ALL">
+                        All ({{ scan.findings|length }})
+                    </button>
+                    <button type="button" class="btn btn-outline-success filter-btn" data-filter="PASS">
+                        Pass ({{ scan.passed_count }})
+                    </button>
+                    <button type="button" class="btn btn-outline-warning filter-btn" data-filter="WARN">
+                        Warning ({{ scan.warning_count }})
+                    </button>
+                    <button type="button" class="btn btn-outline-danger filter-btn" data-filter="FAIL">
+                        Fail ({{ scan.failure_count }})
+                    </button>
+                </div>
+                <div class="small text-muted mono">
+                    Standards: NIST SP 800-52r2 • RFC 8446 • RFC 5280 • RFC 6797
+                </div>
+            </div>
+
+            <div id="findings-container">
+            {% for f in scan.findings %}
+            {% set r_state = f.result_state or ('PASS' if f.status in ('Pass', 'PASS') else ('WARN' if f.status in ('Warning', 'WARN') else ('FAIL' if f.status in ('Fail', 'FAIL') else 'NOT_EVALUATED'))) %}
+            <div class="finding-item finding-card-row" data-state="{{ r_state }}">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        {% if r_state == 'PASS' %}
+                        <span class="status-badge status-pass"><i class="bi bi-check-lg me-1"></i>PASS</span>
+                        {% elif r_state == 'WARN' %}
+                        <span class="status-badge status-warning"><i class="bi bi-exclamation me-1"></i>WARN</span>
+                        {% elif r_state == 'FAIL' %}
+                        <span class="status-badge status-fail"><i class="bi bi-x-lg me-1"></i>FAIL</span>
+                        {% else %}
+                        <span class="status-badge status-fail"><i class="bi bi-slash-circle me-1"></i>NOT EVALUATED</span>
+                        {% endif %}
+
+                        <span class="fw-bold text-light fs-6">{{ f.title }}</span>
+                        <span class="text-muted small mono">[{{ f.finding_id }}]</span>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary mono small">
+                            {{ f.reference_standard or 'NIST SP 800-52r2' }}
+                        </span>
+                        {% if f.severity == 'Critical' %}
+                        <span class="severity-pill sev-critical">Critical</span>
+                        {% elif f.severity == 'High' %}
+                        <span class="severity-pill sev-high">High</span>
+                        {% elif f.severity == 'Medium' %}
+                        <span class="severity-pill sev-medium">Medium</span>
+                        {% elif f.severity == 'Low' %}
+                        <span class="severity-pill sev-low">Low</span>
+                        {% else %}
+                        <span class="severity-pill sev-info">Informational</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row g-2 text-secondary small">
+                    <div class="col-12">
+                        <span class="fw-bold text-light"><i class="bi bi-search me-1 text-cyan-bright"></i>Evidence:</span>
+                        <span class="mono text-light ms-1">{{ f.evidence }}</span>
+                    </div>
+                    <div class="col-12">
+                        <span class="fw-bold text-light"><i class="bi bi-shield-slash me-1 text-warning"></i>Security Implication:</span>
+                        <span class="ms-1">{{ f.implication }}</span>
+                    </div>
+                    <div class="col-12">
+                        <span class="fw-bold text-light"><i class="bi bi-lightbulb me-1 text-success"></i>Recommended Action:</span>
+                        <span class="text-cyan ms-1">{{ f.recommendation }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+
+        <!-- TAB 2: CERTIFICATE IDENTITY & HIERARCHY -->
+        <div class="tab-pane fade" id="cert" role="tabpanel">
+            {% set cert = scan.certificate_details %}
+            {% if cert and cert.parsed_successfully %}
+
+            <!-- Visual Chain of Trust Hierarchy -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-light mb-0 mono">
+                        <i class="bi bi-diagram-3-fill me-2 text-cyan-bright"></i>Visual Public Key Infrastructure (PKI) Chain of Trust
+                    </h6>
+                    <span class="badge bg-secondary-subtle text-cyan mono small">RFC 5280 Path Model</span>
+                </div>
+                
+                <div class="row g-3 text-center">
+                    {% if cert.chain_hierarchy %}
+                        {% for node in cert.chain_hierarchy %}
+                        <div class="col-md-4">
+                            <div class="p-3 bg-navy-darker rounded border {% if node.trusted_by_system %}border-success{% else %}border-danger{% endif %} h-100 text-start position-relative">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="badge bg-secondary-subtle text-secondary mono small">{{ node.level_name }}</span>
+                                    {% if node.trusted_by_system %}
+                                    <span class="badge bg-success-subtle text-success border border-success mono small">TRUSTED</span>
+                                    {% else %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger mono small">UNTRUSTED</span>
+                                    {% endif %}
+                                </div>
+                                <div class="fw-bold text-light mono text-truncate mb-1" title="{{ node.common_name }}">{{ node.common_name }}</div>
+                                <div class="small text-muted mb-2 text-truncate">{{ node.organization }}</div>
+                                <div class="small text-secondary" style="font-size: 0.73rem;">{{ node.description }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="col-12 text-muted small">Single leaf certificate presented during handshake.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="audit-card cyber-corner">
+                <div class="audit-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-card-text me-2 text-cyan-bright"></i>X.509 Leaf Identity & Validity Fields</span>
+                    <span class="badge bg-secondary-subtle text-light mono">{{ cert.version }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table mb-0 cert-table">
+                        <tbody>
+                            <tr>
+                                <th style="width: 25%;">Subject Common Name (CN)</th>
+                                <td class="fw-bold text-cyan-bright mono">{{ cert.subject_common_name or 'None' }}</td>
+                            </tr>
+                            <tr>
+                                <th>Subject Distinguished Name (DN)</th>
+                                <td class="mono small">{{ cert.subject_dn }}</td>
+                            </tr>
+                            <tr>
+                                <th>Issuer Common Name (CA)</th>
+                                <td class="fw-bold text-light">{{ cert.issuer_common_name or 'None' }}</td>
+                            </tr>
+                            <tr>
+                                <th>Issuer Distinguished Name (DN)</th>
+                                <td class="mono small">{{ cert.issuer_dn }}</td>
+                            </tr>
+                            <tr>
+                                <th>Subject Alternative Names (SANs)</th>
+                                <td>
+                                    {% if cert.subject_alternative_names %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for san in cert.subject_alternative_names %}
+                                        <span class="badge bg-secondary-subtle text-cyan border border-secondary mono">{{ san }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-warning small mono">No SANs present (Certificate relies on legacy CN)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Hostname Verification Outcome</th>
+                                <td>
+                                    {% if cert.hostname_matched %}
+                                    <span class="text-success fw-bold"><i class="bi bi-check-circle me-1"></i>{{ cert.hostname_match_details }}</span>
+                                    {% else %}
+                                    <span class="text-danger fw-bold"><i class="bi bi-x-circle me-1"></i>{{ cert.hostname_match_details }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Validity Period</th>
+                                <td>
+                                    <div><strong>Valid From:</strong> <span class="mono">{{ cert.valid_from_iso }}</span></div>
+                                    <div><strong>Valid Until:</strong> <span class="mono">{{ cert.valid_to_iso }}</span></div>
+                                    <div class="small text-muted mt-1 mono">Total Validity: {{ cert.total_validity_days }} days ({{ cert.days_remaining }} days remaining)</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Serial Number</th>
+                                <td class="mono small">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span>{{ cert.serial_number_hex }}</span>
+                                        <button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="copyToClipboard('{{ cert.serial_number_hex }}', this)">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>SHA-256 Fingerprint</th>
+                                <td class="mono small">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span>{{ cert.fingerprint_sha256 }}</span>
+                                        <button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="copyToClipboard('{{ cert.fingerprint_sha256 }}', this)">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>SHA-1 Fingerprint (Legacy)</th>
+                                <td class="mono small text-secondary">{{ cert.fingerprint_sha1 }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <div class="audit-card p-4 text-center">
+                <i class="bi bi-file-earmark-x fs-1 text-muted mb-2"></i>
+                <h6 class="text-secondary fw-bold mono">NO CERTIFICATE PRESENTED</h6>
+                <p class="small text-muted">The TLS handshake could not retrieve or parse a peer certificate.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- TAB 3: CRYPTOGRAPHIC PRIMITIVES & EXTENSIONS -->
+        <div class="tab-pane fade" id="crypto" role="tabpanel">
+            {% set cert = scan.certificate_details %}
+            {% if cert and cert.parsed_successfully %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="audit-card cyber-corner h-100">
+                        <div class="audit-card-header">
+                            <i class="bi bi-key-fill me-2 text-cyan-bright"></i>Public Key & Signature Specifications
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table mb-0 cert-table">
+                                <tbody>
+                                    <tr>
+                                        <th>Public Key Algorithm</th>
+                                        <td class="fw-bold text-light mono">{{ cert.public_key_algorithm }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Key Size</th>
+                                        <td class="mono">
+                                            {{ cert.public_key_size }} bits
+                                            {% if cert.public_key_size and cert.public_key_size >= 2048 %}
+                                            <span class="badge bg-success-subtle text-success ms-1">Compliant</span>
+                                            {% else %}
+                                            <span class="badge bg-danger-subtle text-danger ms-1">Weak</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Key Specification</th>
+                                        <td class="small mono">{{ cert.public_key_details }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Signature Algorithm</th>
+                                        <td class="mono small text-light">{{ cert.signature_algorithm }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Signature Hash Algorithm</th>
+                                        <td class="mono small">{{ cert.signature_hash_algorithm or 'Embedded in OID' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Basic Constraints</th>
+                                        <td>
+                                            Is CA: <span class="fw-bold {% if cert.is_ca %}text-warning{% else %}text-success{% endif %} mono">{{ cert.is_ca }}</span>
+                                            {% if cert.path_length is not none %} | Path Length: <span class="mono">{{ cert.path_length }}</span>{% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="audit-card cyber-corner h-100">
+                        <div class="audit-card-header">
+                            <i class="bi bi-tags-fill me-2 text-cyan-bright"></i>X.509 Key Usages & Authority Info
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table mb-0 cert-table">
+                                <tbody>
+                                    <tr>
+                                        <th>Key Usage</th>
+                                        <td>
+                                            {% if cert.key_usages %}
+                                            <div class="d-flex flex-wrap gap-1">
+                                                {% for u in cert.key_usages %}
+                                                <span class="badge bg-secondary-subtle text-light border border-secondary">{{ u }}</span>
+                                                {% endfor %}
+                                            </div>
+                                            {% else %}
+                                            <span class="text-muted small">None specified</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Extended Key Usage</th>
+                                        <td>
+                                            {% if cert.extended_key_usages %}
+                                            <div class="d-flex flex-wrap gap-1">
+                                                {% for e in cert.extended_key_usages %}
+                                                <span class="badge bg-secondary-subtle text-cyan border border-secondary mono">{{ e }}</span>
+                                                {% endfor %}
+                                            </div>
+                                            {% else %}
+                                            <span class="text-muted small">None specified</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>OCSP Responders</th>
+                                        <td class="mono small">
+                                            {% for url in cert.ocsp_urls %}
+                                            <div>{{ url }}</div>
+                                            {% else %}
+                                            <span class="text-muted">None specified in AIA</span>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>CA Issuers (AIA)</th>
+                                        <td class="mono small">
+                                            {% for url in cert.ca_issuer_urls %}
+                                            <div>{{ url }}</div>
+                                            {% else %}
+                                            <span class="text-muted">None specified</span>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>CRL Distribution</th>
+                                        <td class="mono small">
+                                            {% for url in cert.crl_distribution_points %}
+                                            <div>{{ url }}</div>
+                                            {% else %}
+                                            <span class="text-muted">None specified</span>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="audit-card p-4 text-center">
+                <i class="bi bi-cpu fs-1 text-muted mb-2"></i>
+                <h6 class="text-secondary fw-bold mono">CRYPTOGRAPHIC TELEMETRY UNAVAILABLE</h6>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- TAB 4: DIAGNOSTICS & RAW TELEMETRY -->
+        <div class="tab-pane fade" id="raw" role="tabpanel">
+            <div class="audit-card cyber-corner p-4">
+                <h6 class="fw-bold text-cyan-bright mb-3 mono"><i class="bi bi-shield-check me-2"></i>Network Security & Anti-SSRF Architecture</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="p-3 bg-navy-darker rounded border border-secondary-subtle">
+                            <div class="small text-muted mono">PINNED DESTINATION IP</div>
+                            <div class="fw-bold mono text-light mt-1">{{ scan.ip_address }}</div>
+                            <div class="small text-secondary mt-1">Direct connect eliminates Time-of-Check / Time-of-Use (TOCTOU) DNS rebinding.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-navy-darker rounded border border-secondary-subtle">
+                            <div class="small text-muted mono">ALL RESOLVED IPS</div>
+                            <div class="fw-bold mono text-cyan mt-1">
+                                {{ scan.resolved_ips|join(', ') if scan.resolved_ips else 'N/A' }}
+                            </div>
+                            <div class="small text-secondary mt-1">Every resolved IP was audited to block loopback, private, and reserved ranges.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-navy-darker rounded border border-secondary-subtle">
+                            <div class="small text-muted mono">SERVER NAME INDICATION (SNI)</div>
+                            <div class="fw-bold mono text-light mt-1">{{ scan.hostname }}</div>
+                            <div class="small text-secondary mt-1">Transmitted in ClientHello to ensure the edge router sends the correct certificate.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-light mb-0 mono"><i class="bi bi-filetype-json me-2 text-cyan-bright"></i>Full Telemetry JSON</h6>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="copyToClipboard(document.getElementById('raw-json-block').textContent, this)">
+                        <i class="bi bi-clipboard me-1"></i> Copy Payload
+                    </button>
+                </div>
+                <pre id="raw-json-block" class="p-3 bg-navy-darker text-light rounded border border-secondary-subtle mono small mb-0" style="max-height: 400px; overflow-y: auto;">{{ scan|tojson(indent=2) }}</pre>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Posture Radar Chart
+    const canvas = document.getElementById("postureRadarCanvas");
+    if (canvas) {
+        const tlsVer = "{{ scan.tls_version }}";
+        const chainOk = {{ 'true' if scan.chain_verified_by_ca else 'false' }};
+        const hostOk = {{ 'true' if (scan.certificate_details and scan.certificate_details.hostname_matched) else 'false' }};
+        const isPfs = {{ 'true' if (scan.cipher_suite and ('ECDHE' in scan.cipher_suite or 'DHE' in scan.cipher_suite or 'TLS_AES' in scan.cipher_suite)) else 'false' }};
+        const keySize = {{ scan.certificate_details.public_key_size if (scan.certificate_details and scan.certificate_details.public_key_size) else 0 }};
+        const daysLeft = {{ scan.certificate_details.days_remaining if (scan.certificate_details and scan.certificate_details.days_remaining is not none) else 0 }};
+
+        const protoScore = (tlsVer === "TLSv1.3") ? 100 : ((tlsVer === "TLSv1.2") ? 80 : 20);
+        const trustScore = chainOk ? 100 : 0;
+        const hostScore = hostOk ? 100 : 0;
+        const cipherScore = isPfs ? 100 : 40;
+        const keyScore = (keySize >= 2048) ? 100 : (keySize >= 1024 ? 50 : 20);
+        const timeScore = (daysLeft > 30) ? 100 : (daysLeft > 7 ? 60 : (daysLeft > 0 ? 30 : 0));
+
+        new Chart(canvas.getContext("2d"), {
+            type: 'radar',
+            data: {
+                labels: ['Proto', 'Trust', 'Host', 'Cipher', 'Key', 'Time'],
+                datasets: [{
+                    data: [protoScore, trustScore, hostScore, cipherScore, keyScore, timeScore],
+                    backgroundColor: 'rgba(0, 242, 254, 0.25)',
+                    borderColor: '#00f2fe',
+                    borderWidth: 1.5,
+                    pointBackgroundColor: '#38bdf8',
+                    pointRadius: 2,
+                }]
+            },
+            options: {
+                responsive: false,
+                scales: {
+                    r: {
+                        min: 0,
+                        max: 100,
+                        ticks: { display: false },
+                        grid: { color: 'rgba(56, 189, 248, 0.15)' },
+                        angleLines: { color: 'rgba(56, 189, 248, 0.15)' },
+                        pointLabels: {
+                            color: '#94a3b8',
+                            font: { size: 9, family: 'JetBrains Mono' }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: true }
+                }
+            }
+        });
+    }
+
+    // 2. Interactive Finding Filter Buttons
+    const filterBtns = document.querySelectorAll(".filter-btn");
+    const findingRows = document.querySelectorAll(".finding-card-row");
+
+    filterBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            filterBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            const filter = btn.getAttribute("data-filter");
+            findingRows.forEach(row => {
+                const state = row.getAttribute("data-state");
+                if (filter === "ALL" || state === filter) {
+                    row.style.display = "block";
+                } else {
+                    row.style.display = "none";
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

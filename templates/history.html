@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}TLScope — Scan Audit Log{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Top Navigation Actions -->
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div>
+            <h3 class="fw-bold text-light mb-1 mono">
+                <i class="bi bi-clock-history me-2 text-cyan-bright"></i>Scan Audit History
+            </h3>
+            <p class="small text-secondary mb-0">Persistent SQLite audit logs for academic coursework and viva demonstration.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-cyan btn-sm">
+                <i class="bi bi-plus-circle me-1"></i> New Inspection
+            </a>
+            {% if scans %}
+            <button id="clear-history-btn" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash3 me-1"></i> Purge All History
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Aggregate Statistics HUD -->
+    {% if stats and stats.total_scans > 0 %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="telemetry-tile cyber-corner">
+                <div class="telemetry-label">Total Audits</div>
+                <div class="telemetry-value text-cyan-bright mono">{{ stats.total_scans }}</div>
+                <div class="small text-muted mt-1 mono">Recorded Scans</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="telemetry-tile cyber-corner">
+                <div class="telemetry-label">Secure Rate</div>
+                <div class="telemetry-value text-success mono">
+                    {% if stats.total_scans > 0 %}
+                    {{ ((stats.secure_count / stats.total_scans) * 100)|round(1) }}%
+                    {% else %}0%{% endif %}
+                </div>
+                <div class="small text-muted mt-1 mono">{{ stats.secure_count }} Secure Scans</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="telemetry-tile cyber-corner">
+                <div class="telemetry-label">Average Score</div>
+                <div class="telemetry-value text-light mono">
+                    {{ stats.avg_score if stats.avg_score is not none else 'N/A' }}
+                </div>
+                <div class="small text-muted mt-1 mono">Out of 100</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="telemetry-tile cyber-corner">
+                <div class="telemetry-label">TLS 1.3 Adoption</div>
+                <div class="telemetry-value text-cyan mono">
+                    {% if stats.total_scans > 0 %}
+                    {{ ((stats.tls13_count / stats.total_scans) * 100)|round(1) }}%
+                    {% else %}0%{% endif %}
+                </div>
+                <div class="small text-muted mt-1 mono">{{ stats.tls13_count }} of {{ stats.total_scans }} Scans</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filter & Search Toolbar -->
+    <div class="audit-card cyber-corner p-3 mb-4">
+        <form method="GET" action="{{ url_for('history') }}" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-navy-darker border-secondary-subtle text-muted">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" name="q" class="form-control scanner-input text-light" placeholder="Search target hostnames..." value="{{ current_search or '' }}">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="status" class="form-select form-select-sm scanner-input text-light">
+                    <option value="ALL" {% if current_status == 'ALL' %}selected{% endif %}>All Postures</option>
+                    <option value="SECURE" {% if current_status == 'SECURE' %}selected{% endif %}>Secure Only</option>
+                    <option value="WARNINGS" {% if current_status == 'WARNINGS' %}selected{% endif %}>With Warnings Only</option>
+                    <option value="INSECURE" {% if current_status == 'INSECURE' %}selected{% endif %}>Insecure Only</option>
+                    <option value="FAILED" {% if current_status == 'FAILED' %}selected{% endif %}>Failed Only</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="sort" class="form-select form-select-sm scanner-input text-light">
+                    <option value="newest" {% if current_sort == 'newest' %}selected{% endif %}>Newest First</option>
+                    <option value="oldest" {% if current_sort == 'oldest' %}selected{% endif %}>Oldest First</option>
+                    <option value="score_desc" {% if current_sort == 'score_desc' %}selected{% endif %}>Score (High-Low)</option>
+                    <option value="score_asc" {% if current_sort == 'score_asc' %}selected{% endif %}>Score (Low-High)</option>
+                    <option value="hostname" {% if current_sort == 'hostname' %}selected{% endif %}>Hostname (A-Z)</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-cyan btn-sm flex-grow-1">Filter</button>
+                {% if current_search or current_status != 'ALL' or current_sort != 'newest' %}
+                <a href="{{ url_for('history') }}" class="btn btn-outline-secondary btn-sm" title="Reset Filters">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if scans %}
+    <div class="audit-card cyber-corner">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 cert-table">
+                <thead>
+                    <tr>
+                        <th>Target Hostname</th>
+                        <th>Port / Pinned IP</th>
+                        <th>Negotiated TLS</th>
+                        <th>Security Posture</th>
+                        <th>Score</th>
+                        <th>Findings Matrix</th>
+                        <th>Timestamp (UTC)</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in scans %}
+                    <tr id="scan-row-{{ s.scan_id }}">
+                        <td class="fw-bold mono text-light">
+                            <a href="{{ url_for('view_scan', scan_id=s.scan_id) }}" class="text-cyan text-decoration-none">
+                                {{ s.hostname }}
+                            </a>
+                        </td>
+                        <td class="mono small text-secondary">{{ s.port }} / {{ s.ip_address or '—' }}</td>
+                        <td>
+                            <span class="badge bg-secondary-subtle text-light border border-secondary mono">
+                                {{ s.tls_version or 'N/A' }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if s.overall_outcome == 'SECURE' %}
+                            <span class="status-badge status-pass"><span class="pulse-beacon pulse-beacon-green"></span>SECURE</span>
+                            {% elif s.overall_outcome == 'WARNINGS' %}
+                            <span class="status-badge status-warning"><i class="bi bi-exclamation-circle me-1"></i>WARNINGS</span>
+                            {% elif s.overall_outcome == 'INSECURE' %}
+                            <span class="status-badge status-fail"><span class="pulse-beacon pulse-beacon-red"></span>INSECURE</span>
+                            {% else %}
+                            <span class="status-badge status-fail"><i class="bi bi-x-circle me-1"></i>FAILED</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if s.educational_score is not none %}
+                            <span class="fw-bold {% if s.educational_score >= 85 %}text-success{% elif s.educational_score >= 60 %}text-warning{% else %}text-danger{% endif %} mono">
+                                {{ s.educational_score }}/100
+                            </span>
+                            {% else %}
+                            <span class="text-muted small mono">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td class="small mono">
+                            <span class="text-success fw-bold">{{ s.passed_count }}P</span> /
+                            <span class="text-warning fw-bold">{{ s.warning_count }}W</span> /
+                            <span class="text-danger fw-bold">{{ s.failure_count }}F</span>
+                        </td>
+                        <td class="small text-secondary mono">{{ s.scan_timestamp }}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('view_scan', scan_id=s.scan_id) }}" class="btn btn-outline-secondary" title="View Dashboard">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('download_pdf', scan_id=s.scan_id) }}" class="btn btn-outline-cyan" title="Download PDF Report">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-danger btn-delete-scan" data-id="{{ s.scan_id }}" data-host="{{ s.hostname }}" title="Delete Scan Record">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="audit-card cyber-corner p-5 text-center">
+        <i class="bi bi-inbox fs-1 text-muted mb-3 d-block"></i>
+        <h5 class="text-secondary fw-bold mono">NO AUDIT LOGS FOUND</h5>
+        <p class="small text-muted mb-3">
+            {% if current_search or current_status != 'ALL' %}
+            No scans match your search or filter criteria.
+            {% else %}
+            All conducted TLS and HTTPS security scans are logged here automatically.
+            {% endif %}
+        </p>
+        <a href="{{ url_for('index') }}" class="btn btn-cyan btn-sm px-4">
+            <i class="bi bi-lightning-charge me-1"></i> Start a Scan
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // Delete individual scan confirmation
+    const deleteButtons = document.querySelectorAll(".btn-delete-scan");
+    deleteButtons.forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const scanId = btn.getAttribute("data-id");
+            const host = btn.getAttribute("data-host");
+
+            if (!confirm(`Are you sure you want to delete the audit record for '${host}'?`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/scan/${scanId}/delete`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    const row = document.getElementById(`scan-row-${scanId}`);
+                    if (row) {
+                        row.remove();
+                    }
+                } else {
+                    alert("Error deleting record: " + (data.error || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Network failure communicating with database service.");
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

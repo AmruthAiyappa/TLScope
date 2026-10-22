@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}TLScope — PKI Architecture & Cryptographic Reference Guide{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- Breadcrumb / Header -->
+    <div class="mb-4">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm mb-3">
+            <i class="bi bi-arrow-left me-1"></i> Back to Scanner Console
+        </a>
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge badge-academic px-3 py-1 rounded-pill">
+                <i class="bi bi-book-half me-1"></i> Academic Coursework Reference
+            </span>
+            <span class="text-muted small mono">RFC 8446 • RFC 5280 • RFC 6125 • RFC 6797 • NIST SP 800-52r2</span>
+        </div>
+        <h1 class="hero-title fw-bold text-light mb-2">
+            Public Key Infrastructure & TLS Architecture
+        </h1>
+        <p class="lead text-secondary" style="font-size: 1.1rem;">
+            A rigorous technical reference detailing Transport Layer Security protocols, X.509 certificate trust chains, cryptographic cipher suites, and verification algorithms.
+        </p>
+    </div>
+
+    <div class="row g-4">
+        <!-- Main Content Column -->
+        <div class="col-lg-8">
+
+            <!-- Section 1: TLS Core Guarantees -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <h4 class="fw-bold text-cyan-bright mb-3">
+                    <i class="bi bi-shield-lock-fill me-2"></i>1. Core Guarantees of Transport Layer Security
+                </h4>
+                <p class="text-secondary small">
+                    <strong>Transport Layer Security (TLS)</strong> resides between the transport layer (TCP) and the application layer (HTTP/WebSocket/SMTP). It solves the fundamental network problem of untrusted intermediate routing by providing three cryptographic guarantees:
+                </p>
+                <div class="row g-3 mt-1 mb-2">
+                    <div class="col-md-4">
+                        <div class="p-3 bg-navy-darker rounded border border-secondary-subtle h-100">
+                            <h6 class="text-light fw-bold mb-1"><i class="bi bi-eye-slash text-cyan me-1"></i> Confidentiality</h6>
+                            <p class="text-muted small mb-0">Payload plaintext is encrypted using high-entropy symmetric ciphers (AES-256-GCM, ChaCha20-Poly1305), ensuring eavesdroppers observe only ciphertext.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-navy-darker rounded border border-secondary-subtle h-100">
+                            <h6 class="text-light fw-bold mb-1"><i class="bi bi-check2-circle text-success me-1"></i> Integrity</h6>
+                            <p class="text-muted small mb-0">Authenticated Encryption with Associated Data (AEAD) ensures that any transmission bit modification or truncation is mathematically detected and dropped.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 bg-navy-darker rounded border border-secondary-subtle h-100">
+                            <h6 class="text-light fw-bold mb-1"><i class="bi bi-patch-check text-warning me-1"></i> Authentication</h6>
+                            <p class="text-muted small mb-0">The remote server's cryptographic identity is authenticated via X.509 digital certificates and digital signatures signed by trusted authorities.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: PKI Hierarchy & Trust Chains -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <h4 class="fw-bold text-cyan-bright mb-3">
+                    <i class="bi bi-diagram-3-fill me-2"></i>2. Public Key Infrastructure (PKI) & Trust Chains
+                </h4>
+                <p class="text-secondary small">
+                    An X.509 digital certificate binds a cryptographic public key to a designated domain name identity. Because operating systems cannot store millions of site certificates, trust is established hierarchically:
+                </p>
+                
+                <div class="p-3 bg-navy-darker rounded border border-secondary-subtle mb-3">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <span class="badge bg-secondary-subtle text-light border border-secondary mono">ROOT CA</span>
+                        <span class="text-light fw-bold">Pre-Installed Root Trust Anchor</span>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        Pre-distributed in operating system and browser trust stores (e.g. Mozilla NSS, Windows Root Store). Root CAs are unconditionally trusted and strictly self-signed. Their private keys remain in air-gapped Hardware Security Modules (HSMs).
+                    </p>
+                </div>
+
+                <div class="p-3 bg-navy-darker rounded border border-secondary-subtle mb-3 ms-md-4">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <span class="badge bg-secondary-subtle text-cyan border border-secondary mono">INTERMEDIATE CA</span>
+                        <span class="text-light fw-bold">Delegated Issuing Authority</span>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        Signed directly by a Root CA with the <code>BasicConstraints: CA:TRUE, keyCertSign</code> extensions. Intermediates issue end-entity certificates on a daily basis, insulating the root private key from compromise.
+                    </p>
+                </div>
+
+                <div class="p-3 bg-navy-darker rounded border border-secondary-subtle ms-md-5">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <span class="badge bg-secondary-subtle text-success border border-secondary mono">LEAF CERTIFICATE</span>
+                        <span class="text-light fw-bold">Target Server End-Entity</span>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        Presented by the target web server during the TLS handshake. Binds domain identities in the Subject Alternative Name (SAN) extension. Cannot sign other certificates (<code>BasicConstraints: CA:FALSE</code>).
+                    </p>
+                </div>
+            </div>
+
+            <!-- Section 3: Hostname Verification -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <h4 class="fw-bold text-cyan-bright mb-3">
+                    <i class="bi bi-patch-check-fill me-2"></i>3. Hostname Verification & RFC 6125 Standard
+                </h4>
+                <p class="text-secondary small">
+                    Having a valid, trusted certificate signature is useless if the certificate belongs to an entity other than the one intended. If an attacker intercepts traffic destined for <code>bank.com</code> and presents a valid certificate for <code>attacker.com</code>, an application without hostname verification would accept the connection.
+                </p>
+                <ul class="text-secondary small ps-3">
+                    <li><strong>RFC 6125 Mandate:</strong> Clients match the requested hostname against the <code>Subject Alternative Name (SAN)</code> extension entries (e.g. <code>dNSName</code> or <code>iPAddress</code>).</li>
+                    <li><strong>Legacy Common Name (CN):</strong> Deprecated by RFC 6125 and ignored by modern browsers when SAN extensions are present.</li>
+                    <li><strong>Wildcard Matching Rules:</strong> A wildcard such as <code>*.example.com</code> matches <code>foo.example.com</code>, but MUST NOT match multi-level subdomains such as <code>bar.foo.example.com</code>.</li>
+                </ul>
+            </div>
+
+            <!-- Section 4: Modern Cryptographic Ciphers & PFS -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <h4 class="fw-bold text-cyan-bright mb-3">
+                    <i class="bi bi-cpu-fill me-2"></i>4. Cryptographic Ciphers & Perfect Forward Secrecy (PFS)
+                </h4>
+                <p class="text-secondary small">
+                    In modern TLS, cipher suites specify the key exchange, authentication, symmetric encryption, and integrity algorithms:
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-hover cert-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Primitive</th>
+                                <th>Legacy / Vulnerable (Deprecated)</th>
+                                <th>Modern Recommended Standards</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="fw-bold mono text-light">Key Exchange</td>
+                                <td class="text-danger small">Static RSA (Vulnerable: No PFS)</td>
+                                <td class="text-success small mono">ECDHE (P-256, X25519) with Mandatory PFS</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold mono text-light">Symmetric Cipher</td>
+                                <td class="text-danger small">RC4, 3DES, CBC-mode AES (POODLE / Lucky13)</td>
+                                <td class="text-success small mono">AES-128-GCM, AES-256-GCM, ChaCha20-Poly1305</td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold mono text-light">Signature Hash</td>
+                                <td class="text-danger small">MD5, SHA-1 (Collision Attacks)</td>
+                                <td class="text-success small mono">SHA-256, SHA-384, SHA-512, Ed25519</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3 p-3 bg-navy-darker rounded border border-secondary-subtle">
+                    <h6 class="text-light fw-bold mb-1"><i class="bi bi-shield-check text-cyan me-1"></i> What is Perfect Forward Secrecy (PFS)?</h6>
+                    <p class="text-muted small mb-0">
+                        PFS ensures that session keys are generated ephemerally via Diffie-Hellman exchange rather than being encrypted under the server's long-term RSA private key. If the server's private key is stolen or leaked in the future, an adversary who recorded past network traffic cannot retrospectively decrypt the stored communications.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Section 5: HTTP Strict Transport Security -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <h4 class="fw-bold text-cyan-bright mb-3">
+                    <i class="bi bi-arrow-repeat me-2"></i>5. HTTP Strict Transport Security (HSTS, RFC 6797)
+                </h4>
+                <p class="text-secondary small">
+                    Even when a web server supports HTTPS, users often type <code>example.com</code> into their browser, triggering an initial plaintext HTTP request over port 80. An attacker on the local network can intercept this request and execute an <strong>SSL Stripping</strong> attack, preventing the upgrade to HTTPS.
+                </p>
+                <p class="text-secondary small">
+                    <strong>HSTS (RFC 6797)</strong> prevents this vulnerability:
+                </p>
+                <div class="p-3 bg-navy-darker rounded border border-secondary-subtle mono small mb-2">
+                    Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+                </div>
+                <ul class="text-muted small ps-3 mb-0">
+                    <li><code>max-age=31536000</code>: Instructs the browser to strictly remember to communicate only via HTTPS for at least 1 year.</li>
+                    <li><code>includeSubDomains</code>: Applies the HTTPS enforcement rule to all subdomains.</li>
+                    <li><code>preload</code>: Submits the domain to browser vendor preload lists, enforcing HTTPS on the very first connection.</li>
+                </ul>
+            </div>
+
+        </div>
+
+        <!-- Sidebar Reference Column -->
+        <div class="col-lg-4">
+            <!-- Standards Matrix Card -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <h5 class="fw-bold text-light mb-3 mono"><i class="bi bi-bookmark-fill text-cyan-bright me-2"></i>Standards Matrix</h5>
+                <div class="d-flex flex-column gap-2 small">
+                    <div class="p-2 bg-navy-darker rounded border border-secondary-subtle">
+                        <span class="badge bg-secondary-subtle text-cyan mono">RFC 8446</span>
+                        <div class="text-light fw-bold mt-1">The Transport Layer Security (TLS) Protocol Version 1.3</div>
+                    </div>
+                    <div class="p-2 bg-navy-darker rounded border border-secondary-subtle">
+                        <span class="badge bg-secondary-subtle text-cyan mono">RFC 5246</span>
+                        <div class="text-light fw-bold mt-1">The Transport Layer Security (TLS) Protocol Version 1.2</div>
+                    </div>
+                    <div class="p-2 bg-navy-darker rounded border border-secondary-subtle">
+                        <span class="badge bg-secondary-subtle text-cyan mono">RFC 5280</span>
+                        <div class="text-light fw-bold mt-1">Internet X.509 Public Key Infrastructure Certificate & CRL Profile</div>
+                    </div>
+                    <div class="p-2 bg-navy-darker rounded border border-secondary-subtle">
+                        <span class="badge bg-secondary-subtle text-cyan mono">RFC 6125</span>
+                        <div class="text-light fw-bold mt-1">Representation & Verification of Domain-Based Application Service Identity</div>
+                    </div>
+                    <div class="p-2 bg-navy-darker rounded border border-secondary-subtle">
+                        <span class="badge bg-secondary-subtle text-cyan mono">RFC 6797</span>
+                        <div class="text-light fw-bold mt-1">HTTP Strict Transport Security (HSTS)</div>
+                    </div>
+                    <div class="p-2 bg-navy-darker rounded border border-secondary-subtle">
+                        <span class="badge bg-secondary-subtle text-cyan mono">NIST SP 800-52r2</span>
+                        <div class="text-light fw-bold mt-1">Guidelines for the Selection, Configuration, and Use of TLS</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- How TLScope Audits -->
+            <div class="audit-card cyber-corner p-4 mb-4">
+                <h5 class="fw-bold text-light mb-3 mono"><i class="bi bi-search text-cyan-bright me-2"></i>TLScope Audit Engine</h5>
+                <p class="text-secondary small">
+                    TLScope executes an authentic, non-intrusive handshake against user-authorized targets:
+                </p>
+                <div class="d-flex flex-column gap-2 small text-muted">
+                    <div><i class="bi bi-check-circle-fill text-success me-1"></i> Evaluates genuine client-observed TLS parameters.</div>
+                    <div><i class="bi bi-check-circle-fill text-success me-1"></i> Validates CA signatures against system root store.</div>
+                    <div><i class="bi bi-check-circle-fill text-success me-1"></i> Inspects ASN.1 DER leaf structures with <code>cryptography</code>.</div>
+                    <div><i class="bi bi-check-circle-fill text-success me-1"></i> Enforces strict anti-SSRF destination IP pinning.</div>
+                    <div><i class="bi bi-check-circle-fill text-success me-1"></i> Zero data simulation or fabricated scan results.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

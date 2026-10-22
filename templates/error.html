@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Error — TLScope{% endblock %}
+
+{% block content %}
+<div class="container py-5 text-center">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="audit-card cyber-corner p-5">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-shield-x" style="font-size: 3.5rem; filter: drop-shadow(0 0 15px rgba(244, 63, 94, 0.4));"></i>
+                </div>
+                <h3 class="fw-bold text-light mb-2 mono">{{ error_title or "Security Diagnostic Notice" }}</h3>
+                <p class="text-secondary small mb-4">
+                    {{ error_message or "The requested action could not be completed." }}
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <a href="{{ url_for('index') }}" class="btn btn-cyan btn-sm px-3">
+                        <i class="bi bi-house-door me-1"></i> Return to Scanner
+                    </a>
+                    <a href="{{ url_for('history') }}" class="btn btn-outline-secondary btn-sm px-3">
+                        <i class="bi bi-clock-history me-1"></i> Audit History
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

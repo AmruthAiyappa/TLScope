@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}TLScope — Next-Gen TLS & HTTPS Security Analysis{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section text-center">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10 col-xl-8">
+                <span class="badge badge-academic px-3 py-2 rounded-pill mb-3">
+                    <span class="pulse-beacon pulse-beacon-cyan"></span> Cryptography & Network Security Analysis Engine
+                </span>
+                <h1 class="hero-title mb-3">
+                    Deep HTTPS & TLS Security Inspection
+                </h1>
+                <p class="lead text-secondary mb-4" style="font-size: 1.15rem;">
+                    Execute live TLS handshakes, parse binary X.509 leaf certificates, evaluate cryptographic ciphers, and audit trust chains with zero simulated data.
+                </p>
+
+                <!-- Scanner HUD Card -->
+                <div class="scanner-card cyber-corner p-4 text-start mb-4">
+                    <form id="scan-form" autocomplete="off">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-8">
+                                <label for="target-input" class="form-label small text-secondary fw-bold mb-1 d-flex align-items-center">
+                                    <i class="bi bi-shield-check me-1 text-cyan-bright"></i> TARGET HOSTNAME OR HTTPS URL
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-navy-darker border-secondary-subtle text-cyan mono fw-bold">
+                                        https://
+                                    </span>
+                                    <input type="text" id="target-input" class="form-control scanner-input" placeholder="example.com or cloudflare.com" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="port-input" class="form-label small text-secondary fw-bold mb-1 d-flex align-items-center">
+                                    <i class="bi bi-ethernet me-1 text-cyan-bright"></i> PORT
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" id="port-input" class="form-control scanner-input" value="443" min="1" max="65535">
+                                    <button type="submit" id="scan-submit-btn" class="btn btn-cyan px-3">
+                                        <i class="bi bi-lightning-charge-fill me-1"></i> Analyze
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Quick Sample Endpoints -->
+                    <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                        <span class="small text-muted mono">Live Targets:</span>
+                        <a href="#" class="sample-domain-pill text-decoration-none" data-domain="cloudflare.com">
+                            <span class="pulse-beacon pulse-beacon-green"></span>cloudflare.com
+                        </a>
+                        <a href="#" class="sample-domain-pill text-decoration-none" data-domain="google.com">
+                            <span class="pulse-beacon pulse-beacon-cyan"></span>google.com
+                        </a>
+                        <a href="#" class="sample-domain-pill text-decoration-none" data-domain="github.com">
+                            <span class="pulse-beacon pulse-beacon-cyan"></span>github.com
+                        </a>
+                        <a href="#" class="sample-domain-pill text-decoration-none" data-domain="wikipedia.org">
+                            <span class="pulse-beacon pulse-beacon-green"></span>wikipedia.org
+                        </a>
+                    </div>
+
+                    <!-- Error Alert -->
+                    <div id="scanner-error-alert" class="alert alert-danger d-none mt-3 mb-0 d-flex align-items-center gap-2 border-danger" role="alert">
+                        <i class="bi bi-exclamation-octagon-fill fs-5 text-danger"></i>
+                        <span id="scanner-error-message" class="mono small"></span>
+                    </div>
+
+                    <!-- Futuristic Radar Sweep & Progress HUD -->
+                    <div id="scanner-loading" class="scanner-loading mt-4">
+                        <div class="radar-sweep-container">
+                            <div class="radar-sweep-line"></div>
+                            <i class="bi bi-shield-lock text-cyan-bright fs-4" style="z-index: 2;"></i>
+                        </div>
+
+                        <div class="text-center mb-3">
+                            <h6 class="text-cyan-bright fw-bold mb-1 mono">
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                EXECUTING HARDWARE TLS HANDSHAKE & CRYPTOGRAPHIC INSPECTION
+                            </h6>
+                            <div class="small text-muted mono">Establishing pinned TCP socket & negotiating SNI parameters...</div>
+                        </div>
+
+                        <div class="d-flex flex-column gap-2 bg-navy-darker p-3 rounded border border-secondary-subtle">
+                            <div id="step-1" class="step-indicator">
+                                <i class="bi bi-terminal me-2"></i> [01] Normalizing input & checking RFC 1123 hostname syntax
+                            </div>
+                            <div id="step-2" class="step-indicator">
+                                <i class="bi bi-shield-x me-2"></i> [02] Auditing resolved IPs & enforcing strict anti-SSRF destination pinning
+                            </div>
+                            <div id="step-3" class="step-indicator">
+                                <i class="bi bi-arrow-left-right me-2"></i> [03] Transmitting ClientHello with SNI & negotiating TLS session
+                            </div>
+                            <div id="step-4" class="step-indicator">
+                                <i class="bi bi-file-earmark-binary me-2"></i> [04] Parsing ASN.1 DER leaf certificate & evaluating SAN identities
+                            </div>
+                            <div id="step-5" class="step-indicator">
+                                <i class="bi bi-cpu me-2"></i> [05] Synthesizing NIST SP 800-52r2 security findings & scoring matrix
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Analysis Capabilities Grid -->
+<section class="py-4">
+    <div class="container">
+        <div class="text-center mb-4">
+            <span class="badge badge-academic px-3 py-1 rounded-pill mb-2">RFC-Compliant Verification Engine</span>
+            <h3 class="fw-bold text-light">Six Security Pillars Evaluated</h3>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <div class="d-flex align-items-center gap-2 text-cyan-bright mb-2">
+                        <i class="bi bi-file-earmark-lock2 fs-4"></i>
+                        <h6 class="fw-bold mb-0 text-light">X.509 Leaf Certificate</h6>
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        Extracts Subject DN, Issuer DN, Serial Number, SHA-256 fingerprint, Basic Constraints, Key Usages, and AIA OCSP endpoints directly from ASN.1 DER structures.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <div class="d-flex align-items-center gap-2 text-cyan-bright mb-2">
+                        <i class="bi bi-diagram-3-fill fs-4"></i>
+                        <h6 class="fw-bold mb-0 text-light">Chain of Trust & CA Authority</h6>
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        Validates the digital signature hierarchy against trusted root authorities without bypassing verification, separating leaf claims from verified chain trust.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <div class="d-flex align-items-center gap-2 text-cyan-bright mb-2">
+                        <i class="bi bi-check2-all fs-4"></i>
+                        <h6 class="fw-bold mb-0 text-light">Hostname Binding (RFC 6125)</h6>
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        Audits domain binding against the Subject Alternative Name (SAN) extension and wildcards to detect identity spoofing and invalid common names.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <div class="d-flex align-items-center gap-2 text-cyan-bright mb-2">
+                        <i class="bi bi-cpu fs-4"></i>
+                        <h6 class="fw-bold mb-0 text-light">Cryptographic Strength</h6>
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        Evaluates public key entropy (RSA &ge; 2048-bit, ECC &ge; 256-bit), signature hash collision resistance, and flags deprecated primitives (MD5/SHA-1).
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <div class="d-flex align-items-center gap-2 text-cyan-bright mb-2">
+                        <i class="bi bi-shield-shaded fs-4"></i>
+                        <h6 class="fw-bold mb-0 text-light">TLS Version & Ciphers</h6>
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        Inspects protocol negotiation (TLS 1.3 / 1.2), Authenticated Encryption (AEAD), and guarantees of Perfect Forward Secrecy (PFS via ECDHE).
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <div class="d-flex align-items-center gap-2 text-cyan-bright mb-2">
+                        <i class="bi bi-calendar-event fs-4"></i>
+                        <h6 class="fw-bold mb-0 text-light">Temporal Validity & Lifespan</h6>
+                    </div>
+                    <p class="small text-secondary mb-0">
+                        Tracks UTC validity boundaries with automated deterministic warnings for certificates expiring within 30 days and emergency 7-day thresholds.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Recent Scans Audit Log Section -->
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+                <h5 class="fw-bold mb-0 text-light"><i class="bi bi-clock-history me-2 text-cyan-bright"></i>Recent Local Audit Logs</h5>
+                <p class="small text-secondary mb-0">Logged locally in SQLite database for academic viva demonstration.</p>
+            </div>
+            {% if recent_scans %}
+            <a href="{{ url_for('history') }}" class="btn btn-outline-cyan btn-sm">
+                View Full Audit History <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+            {% endif %}
+        </div>
+
+        {% if recent_scans %}
+        <div class="audit-card">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 cert-table">
+                    <thead>
+                        <tr>
+                            <th>Target Hostname</th>
+                            <th>Port / Pinned IP</th>
+                            <th>Negotiated TLS</th>
+                            <th>Security Posture</th>
+                            <th>Score</th>
+                            <th>Timestamp</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in recent_scans %}
+                        <tr>
+                            <td class="fw-bold mono text-light">
+                                <a href="{{ url_for('view_scan', scan_id=s.scan_id) }}" class="text-cyan text-decoration-none">
+                                    {{ s.hostname }}
+                                </a>
+                            </td>
+                            <td class="mono small text-secondary">{{ s.port }} / {{ s.ip_address or '—' }}</td>
+                            <td>
+                                <span class="badge bg-secondary-subtle text-light border border-secondary mono">
+                                    {{ s.tls_version or 'N/A' }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if s.overall_outcome == 'SECURE' %}
+                                <span class="status-badge status-pass"><span class="pulse-beacon pulse-beacon-green"></span>SECURE</span>
+                                {% elif s.overall_outcome == 'WARNINGS' %}
+                                <span class="status-badge status-warning"><i class="bi bi-exclamation-circle me-1"></i>WARNINGS</span>
+                                {% elif s.overall_outcome == 'INSECURE' %}
+                                <span class="status-badge status-fail"><span class="pulse-beacon pulse-beacon-red"></span>INSECURE</span>
+                                {% else %}
+                                <span class="status-badge status-fail"><i class="bi bi-x-circle me-1"></i>FAILED</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if s.educational_score is not none %}
+                                <span class="fw-bold {% if s.educational_score >= 85 %}text-success{% elif s.educational_score >= 60 %}text-warning{% else %}text-danger{% endif %} mono">
+                                    {{ s.educational_score }}/100
+                                </span>
+                                {% else %}
+                                <span class="text-muted small mono">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-secondary mono">{{ s.scan_timestamp }}</td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('view_scan', scan_id=s.scan_id) }}" class="btn btn-outline-secondary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                    <a href="{{ url_for('download_pdf', scan_id=s.scan_id) }}" class="btn btn-outline-cyan">
+                                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="audit-card p-5 text-center">
+            <div class="py-2">
+                <i class="bi bi-shield-slash fs-1 text-muted mb-3 d-block"></i>
+                <h6 class="text-secondary fw-bold">NO AUDIT LOGS RECORDED</h6>
+                <p class="small text-muted mb-3">
+                    Submit a target domain above or click one of the live targets to conduct your first TLS security inspection.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Under the Hood: PKI Concepts Section -->
+<section id="pki-concepts" class="py-5 bg-navy-darker border-top border-secondary-subtle">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="badge badge-academic px-3 py-1 rounded-pill mb-2">Viva Technical Reference</span>
+            <h3 class="fw-bold text-light">Public Key Infrastructure (PKI) & TLS Fundamentals</h3>
+            <p class="text-secondary small">Essential Cryptography and Network Security principles demonstrated by this project.</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <h5 class="fw-bold text-cyan-bright mb-3"><i class="bi bi-lock-fill me-2"></i>What TLS Does</h5>
+                    <p class="text-secondary small">
+                        <strong>Transport Layer Security (TLS)</strong> operates between the Transport layer (TCP) and Application layer (HTTP). It provides three core cryptographic guarantees:
+                    </p>
+                    <ul class="text-secondary small ps-3">
+                        <li><strong>Confidentiality:</strong> Encrypts payload data via symmetric stream or block ciphers (AES-GCM, ChaCha20-Poly1305) so eavesdroppers cannot inspect traffic.</li>
+                        <li><strong>Integrity:</strong> Detects tampering via Authenticated Encryption with Associated Data (AEAD) or Message Authentication Codes (MAC).</li>
+                        <li><strong>Authentication:</strong> Verifies server identity using X.509 digital certificates and asymmetric cryptography (RSA, ECDSA).</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <h5 class="fw-bold text-cyan-bright mb-3"><i class="bi bi-diagram-2-fill me-2"></i>Digital Certificates & Chain of Trust</h5>
+                    <p class="text-secondary small">
+                        An <strong>X.509 Digital Certificate</strong> binds a public key to an entity's domain name identity, digitally signed by a Certificate Authority (CA).
+                    </p>
+                    <ul class="text-secondary small ps-3">
+                        <li><strong>Root CA:</strong> Pre-installed, unconditionally trusted certificates in the OS or browser trust store (self-signed).</li>
+                        <li><strong>Intermediate CAs:</strong> Issued by Root CAs to sign end-entity certificates, insulating the root private keys from day-to-day exposure.</li>
+                        <li><strong>End-Entity (Leaf) Certificate:</strong> Presented by the web server to prove its identity for specific hostnames.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <h5 class="fw-bold text-cyan-bright mb-3"><i class="bi bi-patch-check-fill me-2"></i>Hostname Verification (RFC 6125)</h5>
+                    <p class="text-secondary small">
+                        Possessing a valid, trusted certificate is meaningless unless the client verifies that the certificate was issued for the <em>specific hostname</em> being contacted.
+                    </p>
+                    <p class="text-secondary small mb-0">
+                        Under modern RFC 6125 standards, clients match the requested domain name against the <code>Subject Alternative Name (SAN)</code> extension. If SANs are missing or do not match, the browser terminates the connection with an identity mismatch error (even if the CA signature is completely valid).
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="audit-card cyber-corner p-4 h-100">
+                    <h5 class="fw-bold text-cyan-bright mb-3"><i class="bi bi-shield-shaded me-2"></i>Why Certificate Validity &ne; Total Security</h5>
+                    <p class="text-secondary small">
+                        A certificate can be 100% valid while the connection remains insecure. Critical security flaws can still exist:
+                    </p>
+                    <ul class="text-secondary small ps-3 mb-0">
+                        <li>The server may negotiate obsolete protocols (TLS 1.0 or 1.1) or weak non-AEAD cipher suites vulnerable to downgrade attacks.</li>
+                        <li>The server may lack <strong>Perfect Forward Secrecy (PFS)</strong>, meaning past recorded traffic could be decrypted if the server's private key leaks in the future.</li>
+                        <li>The server may fail to implement HTTP Strict Transport Security (HSTS), leaving users open to SSL stripping attacks.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
